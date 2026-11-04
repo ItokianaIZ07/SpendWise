@@ -2,6 +2,7 @@ import 'package:gestion_depenses/core/utils/datetime_util.dart';
 import 'package:gestion_depenses/models/category_limit.dart';
 import 'package:gestion_depenses/models/category_with_limit.dart';
 import 'package:gestion_depenses/models/expense_category.dart';
+import 'package:gestion_depenses/models/budget_period.dart';
 import 'package:gestion_depenses/models/month.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -468,6 +469,94 @@ class ExpenseRepository {
     }
 
     return 0.0;
+  }
+
+  static Future<double> getExpenseForPeriod(BudgetPeriod period) async {
+    final results = await _database.rawQuery(
+      '''
+        SELECT COALESCE(SUM(amount), 0.0) AS total
+        FROM $_tableName
+        WHERE substr(date, 1, 10) >= ? AND substr(date, 1, 10) < ?
+      ''',
+      [period.startDate.toDateString(), period.endDate.toDateString()],
+    );
+    return (results.first['total'] as num).toDouble();
+  }
+
+  static Future<List<ExpenseCategory>> getExpensePerCategoryForPeriod(
+    BudgetPeriod period,
+  ) async {
+    final results = await _database.rawQuery(
+      '''
+        SELECT
+          c.id,
+          c.name,
+          c.color,
+          COALESCE(l.amount, 0.0) AS limit_amount,
+          COALESCE(SUM(e.amount), 0.0) AS total
+        FROM category c
+        LEFT JOIN $_tableName e
+          ON c.id = e.category_id
+          AND substr(e.date, 1, 10) >= ?
+          AND substr(e.date, 1, 10) < ?
+        LEFT JOIN category_limit l ON l.category_id = c.id
+        GROUP BY c.id, c.name, c.color, l.amount
+        ORDER BY total DESC
+      ''',
+      [period.startDate.toDateString(), period.endDate.toDateString()],
+    );
+
+    return results.map((element) {
+      final category = Category(
+        id: element['id'] as int,
+        name: element['name'] as String,
+        color: element['color'] as String?,
+      );
+      final limit = CategoryLimit(
+        amount: (element['limit_amount'] as num).toDouble(),
+        category: category,
+      );
+      return ExpenseCategory(
+        amount: (element['total'] as num).toDouble(),
+        category: CategoryWithLimit(category: category, categoryLimit: limit),
+      );
+    }).toList();
+  }
+
+  static Future<Map<int, double>> getDailyExpenseForPeriod(
+    BudgetPeriod period,
+  ) async {
+    final dailyData = <int, double>{
+      for (var day = 1; day <= period.totalDays; day++) day: 0,
+    };
+    final results = await _database.rawQuery(
+      '''
+        SELECT substr(date, 1, 10) AS expense_date,
+               COALESCE(SUM(amount), 0.0) AS total
+        FROM $_tableName
+        WHERE substr(date, 1, 10) >= ? AND substr(date, 1, 10) < ?
+        GROUP BY substr(date, 1, 10)
+      ''',
+      [period.startDate.toDateString(), period.endDate.toDateString()],
+    );
+
+    for (final result in results) {
+      final expenseDate = DateTime.parse(result['expense_date'] as String);
+      final dayIndex =
+          DateTime.utc(expenseDate.year, expenseDate.month, expenseDate.day)
+              .difference(
+                DateTime.utc(
+                  period.startDate.year,
+                  period.startDate.month,
+                  period.startDate.day,
+                ),
+              )
+              .inDays +
+          1;
+      dailyData[dayIndex] = (result['total'] as num).toDouble();
+    }
+
+    return dailyData;
   }
 
   static Future<double> getExpenseOfTheYear(String year) async {

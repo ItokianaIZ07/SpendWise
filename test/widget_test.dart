@@ -7,24 +7,24 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:gestion_depenses/main.dart';
+import 'package:gestion_depenses/features/home/widgets/salary_form.dart';
+import 'package:gestion_depenses/models/budget_period.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    // await tester.pumpWidget(const HomePage());
+  testWidgets('salary form displays the budget cycle dates', (
+    WidgetTester tester,
+  ) async {
+    await initializeDateFormatting('fr_FR', null);
+    final period = BudgetPeriod.getPeriodByDate(
+      DateTime(2026, 11, 4),
+      renewalDay: 20,
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(MaterialApp(home: SalaryForm(period: period)));
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.textContaining('Période :'), findsOneWidget);
+    expect(find.textContaining('20 oct. 2026'), findsOneWidget);
+    expect(find.textContaining('19 nov. 2026'), findsOneWidget);
   });
 }

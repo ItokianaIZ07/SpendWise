@@ -4,7 +4,9 @@ import 'package:gestion_depenses/core/utils/currency_util.dart';
 import 'package:gestion_depenses/core/utils/datetime_util.dart';
 import 'package:gestion_depenses/exception/monthly_salary_not_found_exception.dart';
 import 'package:gestion_depenses/models/monthly_budget_situation.dart';
+import 'package:gestion_depenses/models/budget_period.dart';
 import 'package:gestion_depenses/services/budget_service.dart';
+import 'package:gestion_depenses/services/budget_cycle_service.dart';
 
 class FinancialDetailPage extends StatefulWidget {
   const FinancialDetailPage({super.key});
@@ -15,6 +17,7 @@ class FinancialDetailPage extends StatefulWidget {
 
 class _FinancialDetailPageState extends State<FinancialDetailPage> {
   MonthlyBudgetSituation? _monthlySituation;
+  BudgetPeriod? _period;
   bool _isLoading = true;
   String? _errorMessage;
   final _currency = CurrencyUtil.getFormater();
@@ -27,18 +30,18 @@ class _FinancialDetailPageState extends State<FinancialDetailPage> {
 
   Future<void> _loadMonthlySituation() async {
     try {
-      final situation = await BudgetService.getMonthlySituation(
-        DatetimeUtil.getNowMonth(),
-        DatetimeUtil.getNowYear(),
-      );
+      final period = await BudgetCycleService.getCurrentPeriod();
+      final situation = await BudgetService.getSituationForPeriod(period);
 
+      if (!mounted) return;
       setState(() {
+        _period = period;
         _monthlySituation = situation;
         _isLoading = false;
       });
     } on MonthlySalaryNotFoundException {
       setState(() {
-        _errorMessage = 'Aucun salaire enregistré pour ce mois.';
+        _errorMessage = 'Aucun salaire enregistré pour ce cycle.';
         _isLoading = false;
       });
     } catch (e) {
@@ -91,7 +94,7 @@ class _FinancialDetailPageState extends State<FinancialDetailPage> {
             icon: Icons.payments_outlined,
             iconBackground: AppTheme.colors.primarySoft,
             iconColor: AppTheme.colors.primary,
-            title: 'Salaire mensuel',
+            title: 'Salaire du cycle',
             value: _currency.format(situation.salary),
             valueColor: AppTheme.colors.primary,
           ),
@@ -113,7 +116,9 @@ class _FinancialDetailPageState extends State<FinancialDetailPage> {
                 : AppTheme.colors.danger,
             title: 'Budget réel disponible',
             value: _currency.format(situation.availableBudget),
-            valueColor: situation.availableBudget >= 0 ? AppTheme.colors.secondary: AppTheme.colors.danger,
+            valueColor: situation.availableBudget >= 0
+                ? AppTheme.colors.secondary
+                : AppTheme.colors.danger,
           ),
           _buildMetricCard(
             icon: Icons.shopping_cart_outlined,
@@ -130,8 +135,6 @@ class _FinancialDetailPageState extends State<FinancialDetailPage> {
   }
 
   Widget _buildSummaryCard(MonthlyBudgetSituation situation) {
-    final monthLabel = _monthLabel(DatetimeUtil.getNowMonth());
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -165,7 +168,8 @@ class _FinancialDetailPageState extends State<FinancialDetailPage> {
                     ),
                   ),
                   Text(
-                    '$monthLabel ${DatetimeUtil.getNowYear()}',
+                    'Du ${DatetimeUtil.formatDate(_period!.startDate)} '
+                    'au ${DatetimeUtil.formatDate(_period!.endDate.subtract(const Duration(days: 1)))}',
                     style: const TextStyle(
                       color: Color(0xFFD5DDF1),
                       fontSize: 14,
@@ -276,23 +280,5 @@ class _FinancialDetailPageState extends State<FinancialDetailPage> {
       ),
       child: Icon(icon, color: color, size: 26),
     );
-  }
-
-  String _monthLabel(int month) {
-    const months = [
-      'Janvier',
-      'Février',
-      'Mars',
-      'Avril',
-      'Mai',
-      'Juin',
-      'Juillet',
-      'Août',
-      'Septembre',
-      'Octobre',
-      'Novembre',
-      'Décembre',
-    ];
-    return months[month - 1];
   }
 }

@@ -1,5 +1,6 @@
 import 'package:gestion_depenses/core/database/migrations/database_migration.dart';
 import 'package:gestion_depenses/core/database/tables/daily_budget_table.dart';
+import 'package:gestion_depenses/core/database/tables/budget_settings_table.dart';
 import 'package:gestion_depenses/core/database/tables/monthly_salary_table.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
@@ -22,8 +23,6 @@ class DatabaseService {
 
   Future<void> initialize() async {
     await _openDatabase();
-
-    // await _runMigrations();
   }
 
   Future<Database> _openDatabase() async {
@@ -31,17 +30,20 @@ class DatabaseService {
       return connexion!;
     }
     String databasePath = await getDatabasesPath();
-    String path = join(databasePath,DatabaseConstants.databaseName,);
+    String path = join(databasePath, DatabaseConstants.databaseName);
     connexion = await openDatabase(
-      path, 
+      path,
       version: DatabaseConstants.version,
       onCreate: (db, version) async {
         await _createTables(db);
         await _insertDefaultData(db);
       },
-      onUpgrade: (db, oldVersion, newVersion) async{
+      onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await DatabaseMigration.upgradeToVersion2(db);
+        }
+        if (oldVersion < 3) {
+          await DatabaseMigration.upgradeToVersion3(db);
         }
       },
     );
@@ -54,6 +56,7 @@ class DatabaseService {
     await LimitTable.createTable(database);
     await AppmetadataTable.createTable(database);
     await MonthlySalaryTable.createTable(database);
+    await BudgetSettingsTable.createTable(database);
     await DailyBudgetTable.createTable(database);
   }
 

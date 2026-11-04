@@ -10,6 +10,7 @@ import 'package:gestion_depenses/models/daily_budget.dart';
 import 'package:gestion_depenses/models/daily_budget_situation.dart';
 import 'package:gestion_depenses/models/expense.dart';
 import 'package:gestion_depenses/models/expense_group.dart';
+import 'package:gestion_depenses/models/budget_period.dart';
 import 'package:gestion_depenses/models/monthly_budget_situation.dart';
 import 'package:gestion_depenses/models/option_result.dart';
 import 'package:gestion_depenses/repositories/expense_repository.dart';
@@ -233,6 +234,9 @@ class ExpenseService {
     );
   }
 
+  static Future<double> getExpenseForPeriod(BudgetPeriod period) =>
+      ExpenseRepository.getExpenseForPeriod(period);
+
   static Future<List<Expense>> getExpenseByLimit(int limit) async {
     return await ExpenseRepository.getExpenseByLimit(limit);
   }
@@ -331,12 +335,9 @@ class ExpenseService {
   }
 
   static Future<void> _checkMonthlyExpenseLimit() async {
-    int month = DatetimeUtil.getNowMonth();
-    int year = DatetimeUtil.getNowYear();
-
     try {
-      MonthlyBudgetSituation monthSituation =
-          await BudgetService.getMonthlySituation(month, year);
+      final MonthlyBudgetSituation monthSituation =
+          await BudgetService.getCurrentSituation();
 
       if (monthSituation.spent >= monthSituation.salary * 0.8 &&
           monthSituation.spent < monthSituation.salary * 0.9) {
@@ -345,8 +346,7 @@ class ExpenseService {
           body:
               "Attention ! Vous avez déjà dépensé 80 % de votre salaire mensuel.",
         );
-      }
-      else if (monthSituation.spent >= monthSituation.salary * 0.9 &&
+      } else if (monthSituation.spent >= monthSituation.salary * 0.9 &&
           monthSituation.spent < monthSituation.salary) {
         await NotificationService.instance.showNotification(
           title: "SpendWise Alert",
@@ -359,7 +359,7 @@ class ExpenseService {
         await NotificationService.instance.showNotification(
           title: "SpendWise Alert",
           body:
-              "Attention ! Vos dépenses réelles de ce mois ont dépassé "
+              "Attention ! Vos dépenses réelles du cycle ont dépassé "
               "votre salaire de "
               "${CurrencyUtil.getFormater().format(monthSituation.salary)}.",
         );
@@ -425,7 +425,12 @@ class ExpenseService {
   static Future<double> calculateTotalExpense({
     Category? category,
     required int year,
-    String? month}) async{
-    return await ExpenseRepository.getTotalExpenses(category: category, year: year, month: month);
+    String? month,
+  }) async {
+    return await ExpenseRepository.getTotalExpenses(
+      category: category,
+      year: year,
+      month: month,
+    );
   }
 }

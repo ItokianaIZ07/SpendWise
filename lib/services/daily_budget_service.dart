@@ -1,10 +1,10 @@
 import 'package:gestion_depenses/core/services/notification_service.dart';
 import 'package:gestion_depenses/core/utils/currency_util.dart';
-import 'package:gestion_depenses/core/utils/datetime_util.dart';
 import 'package:gestion_depenses/exception/daily_budget_not_found.dart';
 import 'package:gestion_depenses/exception/monthly_salary_not_found_exception.dart';
 import 'package:gestion_depenses/exception/negative_amount_value.dart';
 import 'package:gestion_depenses/models/daily_budget.dart';
+import 'package:gestion_depenses/models/budget_period.dart';
 import 'package:gestion_depenses/models/monthly_budget_situation.dart';
 import 'package:gestion_depenses/repositories/daily_budget_repository.dart';
 import 'package:gestion_depenses/services/budget_service.dart';
@@ -50,8 +50,8 @@ class DailyBudgetService {
     return await DailyBudgetRepository.delete(id);
   }
 
-  static Future<double> calculateSumBudgetByPeriod(int month, int year) async {
-    return await DailyBudgetRepository.getSumBudgetByPeriod(month, year);
+  static Future<double> calculateSumBudgetByPeriod(BudgetPeriod period) async {
+    return DailyBudgetRepository.getSumBudgetByPeriod(period);
   }
 
   static Future<void> changeNotificationState(int id, int state) async {
@@ -69,19 +69,16 @@ class DailyBudgetService {
   }
 
   static Future<void> _checkMonthlyBudgetLimit() async {
-    int month = DatetimeUtil.getNowMonth();
-    int year = DatetimeUtil.getNowYear();
-
     try {
-      MonthlyBudgetSituation monthSituation =
-          await BudgetService.getMonthlySituation(month, year);
+      final MonthlyBudgetSituation monthSituation =
+          await BudgetService.getCurrentSituation();
 
       if (monthSituation.plannedBudget > monthSituation.salary) {
         await NotificationService.instance.showNotification(
           title: "SpendWise Alert",
           body:
               "Attention ! Le total des budgets que vous avez planifiés "
-              "ce mois-ci dépasse votre salaire qui est de "
+              "ce cycle dépasse votre salaire qui est de "
               "${CurrencyUtil.getFormater().format(monthSituation.salary)}.",
         );
       } else if (monthSituation.spent > monthSituation.salary) {

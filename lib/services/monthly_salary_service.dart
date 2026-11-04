@@ -1,10 +1,11 @@
 import 'package:gestion_depenses/exception/negative_amount_value.dart';
 import 'package:gestion_depenses/models/monthly_salary.dart';
+import 'package:gestion_depenses/models/budget_period.dart';
 import 'package:gestion_depenses/repositories/monthly_salary_repository.dart';
 
 class MonthlySalaryService {
-  static Future<MonthlySalary?> getSalary(int month, int year) async {
-    return await MonthlySalaryRepository.getByMonth(month, year);
+  static Future<MonthlySalary?> getSalary(BudgetPeriod period) async {
+    return MonthlySalaryRepository.getForPeriod(period);
   }
 
   static Future<int> saveSalary(MonthlySalary salary) async {
@@ -12,13 +13,12 @@ class MonthlySalaryService {
       throw NegativeAmountValue(message: 'Le salaire doit être supérieur à 0.');
     }
 
-    final existingSalary = await MonthlySalaryRepository.getByMonth(
-      salary.month,
-      salary.year,
+    final existingSalary = await MonthlySalaryRepository.getByPeriodStart(
+      salary.periodStart,
     );
 
     if (existingSalary != null) {
-      throw Exception('Un salaire est déjà enregistré pour ce mois.');
+      throw StateError('Un salaire est déjà enregistré pour ce cycle.');
     }
 
     return await MonthlySalaryRepository.insert(salary);
@@ -36,7 +36,7 @@ class MonthlySalaryService {
     return await MonthlySalaryRepository.delete(id);
   }
 
-  static Future<List<MonthlySalary>> getAllSalary() async{
+  static Future<List<MonthlySalary>> getAllSalary() async {
     return await MonthlySalaryRepository.getAll();
   }
 }

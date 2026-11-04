@@ -5,6 +5,7 @@ import 'package:gestion_depenses/features/settings/pages/about_page.dart';
 import 'package:gestion_depenses/features/settings/pages/daily_budget_page.dart';
 import 'package:gestion_depenses/features/settings/pages/salary_page.dart';
 import 'package:gestion_depenses/features/settings/widgets/option_menu.dart';
+import 'package:gestion_depenses/features/settings/widgets/renewal_day_setting.dart';
 import 'package:gestion_depenses/services/expense_service.dart';
 import 'category_list_page.dart';
 
@@ -99,6 +100,7 @@ class SettingPage extends StatelessWidget {
           title: "Salaire",
           screen: const SalaryPage(),
         ),
+        const RenewalDaySetting(),
         OptionMenu(
           context: context,
           icon: const Icon(Icons.monetization_on_outlined),
@@ -177,9 +179,7 @@ class SettingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Paramètres"),
-      ),
+      appBar: AppBar(title: const Text("Paramètres")),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

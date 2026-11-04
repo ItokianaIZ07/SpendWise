@@ -1,6 +1,8 @@
 import 'package:gestion_depenses/core/utils/datetime_util.dart';
 import 'package:gestion_depenses/models/expense_category.dart';
+import 'package:gestion_depenses/models/budget_period.dart';
 import 'package:gestion_depenses/repositories/expense_repository.dart';
+import 'package:gestion_depenses/services/budget_cycle_service.dart';
 
 class StatisticService {
   static Future<double> _getTotalExpenseOfWeek() async {
@@ -13,10 +15,8 @@ class StatisticService {
   }
 
   static Future<double> _getTotalExpenseOfMonth() async {
-    String month = DatetimeUtil.getFormatedMonth();
-    String year = DatetimeUtil.formatNumber(DatetimeUtil.getNowYear());
-
-    return await ExpenseRepository.getExpenseOfTheMonth(month, year);
+    final period = await BudgetCycleService.getCurrentPeriod();
+    return ExpenseRepository.getExpenseForPeriod(period);
   }
 
   static Future<double> _getTotalExpenseOfYear() async {
@@ -39,6 +39,11 @@ class StatisticService {
   static Future<List<ExpenseCategory>> getTotalExpensePerCategory(
     int option,
   ) async {
+    if (option == 1) {
+      final period = await BudgetCycleService.getCurrentPeriod();
+      return ExpenseRepository.getExpensePerCategoryForPeriod(period);
+    }
+
     String week = DatetimeUtil.formatNumber(
       DatetimeUtil.getCurrentWeekNumber(),
     );
@@ -90,23 +95,12 @@ class StatisticService {
   }
 
   static Future<double> _getTotalExpenseOfPreviousMonth() async {
-    DateTime now = DateTime.now();
-
-    int currentMonth = now.month; // 1 à 12
-    int currentYear = now.year;
-
-    int targetMonth = currentMonth - 1;
-    int targetYear = currentYear;
-
-    if (targetMonth < 1) {
-      targetMonth = 12;
-      targetYear = currentYear - 1;
-    }
-
-    String monthStr = DatetimeUtil.formatNumber(targetMonth);
-    String yearStr = targetYear.toString();
-
-    return await ExpenseRepository.getExpenseOfTheMonth(monthStr, yearStr);
+    final currentPeriod = await BudgetCycleService.getCurrentPeriod();
+    final previousPeriod = BudgetPeriod.getPeriodByDate(
+      currentPeriod.startDate.subtract(const Duration(days: 1)),
+      renewalDay: currentPeriod.renewalDay,
+    );
+    return ExpenseRepository.getExpenseForPeriod(previousPeriod);
   }
 
   static Future<double> _getTotalExpenseOfPreviousYear() async {
@@ -162,10 +156,8 @@ class StatisticService {
   }
 
   static Future<Map<int, double>> _getDailyMonthlyExpenseEvolution() async {
-    String month = DatetimeUtil.getFormatedMonth();
-    String year = DatetimeUtil.formatNumber(DatetimeUtil.getNowYear());
-
-    return await ExpenseRepository.getMonthlyDailyExpense(month, year);
+    final period = await BudgetCycleService.getCurrentPeriod();
+    return ExpenseRepository.getDailyExpenseForPeriod(period);
   }
 
   static Future<Map<int, double>> _getYearlyMonthlyExpenseEvolution() async {
@@ -207,23 +199,12 @@ class StatisticService {
 
   static Future<Map<int, double>>
   _getPreviousDailyMonthlyExpenseEvolution() async {
-    DateTime now = DateTime.now();
-
-    int currentMonth = now.month;
-    int currentYear = now.year;
-
-    int targetMonth = currentMonth - 1;
-    int targetYear = currentYear;
-
-    if (targetMonth < 1) {
-      targetMonth = 12; // Décembre
-      targetYear = currentYear - 1;
-    }
-
-    String monthStr = DatetimeUtil.formatNumber(targetMonth);
-    String yearStr = targetYear.toString();
-
-    return await ExpenseRepository.getMonthlyDailyExpense(monthStr, yearStr);
+    final currentPeriod = await BudgetCycleService.getCurrentPeriod();
+    final previousPeriod = BudgetPeriod.getPeriodByDate(
+      currentPeriod.startDate.subtract(const Duration(days: 1)),
+      renewalDay: currentPeriod.renewalDay,
+    );
+    return ExpenseRepository.getDailyExpenseForPeriod(previousPeriod);
   }
 
   static Future<Map<int, double>>

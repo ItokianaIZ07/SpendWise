@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:gestion_depenses/core/themes/app_theme.dart';
 import 'package:gestion_depenses/core/utils/currency_util.dart';
 import 'package:gestion_depenses/core/utils/datetime_util.dart';
-import 'package:gestion_depenses/exception/monthly_salary_not_found_exception.dart';
 import 'package:gestion_depenses/features/settings/widgets/salary_edit_form.dart';
 import 'package:gestion_depenses/models/monthly_salary.dart';
+import 'package:gestion_depenses/models/budget_period.dart';
+import 'package:gestion_depenses/services/budget_cycle_service.dart';
 import 'package:gestion_depenses/services/monthly_salary_service.dart';
 
 class SalaryPage extends StatefulWidget {
@@ -18,6 +19,7 @@ class _SalaryPageState extends State<SalaryPage> {
   final _formatAr = CurrencyUtil.getFormater();
 
   MonthlySalary? _salary;
+  BudgetPeriod? _currentPeriod;
   String? _message;
 
   final List<MonthlySalary> _listMonthlySalary = [];
@@ -30,17 +32,9 @@ class _SalaryPageState extends State<SalaryPage> {
       _message = null;
     });
 
-    final int month = DatetimeUtil.getNowMonth();
-    final int year = DatetimeUtil.getNowYear();
-
     try {
-      MonthlySalary? salary;
-
-      try {
-        salary = await MonthlySalaryService.getSalary(month, year);
-      } on MonthlySalaryNotFoundException catch (e) {
-        _message = "$e";
-      }
+      final currentPeriod = await BudgetCycleService.getCurrentPeriod();
+      final salary = await MonthlySalaryService.getSalary(currentPeriod);
 
       final salaries = await MonthlySalaryService.getAllSalary();
 
@@ -48,6 +42,7 @@ class _SalaryPageState extends State<SalaryPage> {
 
       setState(() {
         _salary = salary;
+        _currentPeriod = currentPeriod;
 
         _listMonthlySalary
           ..clear()
@@ -69,28 +64,8 @@ class _SalaryPageState extends State<SalaryPage> {
     }
   }
 
-  String _formatMonth(int month) {
-    const months = [
-      "Janvier",
-      "Février",
-      "Mars",
-      "Avril",
-      "Mai",
-      "Juin",
-      "Juillet",
-      "Août",
-      "Septembre",
-      "Octobre",
-      "Novembre",
-      "Décembre",
-    ];
-
-    return months[month - 1];
-  }
-
   bool _isCurrentSalary(MonthlySalary salary) {
-    return salary.month == DatetimeUtil.getNowMonth() &&
-        salary.year == DatetimeUtil.getNowYear();
+    return salary.periodStart == _currentPeriod?.startDate;
   }
 
   Future<void> _editCurrentSalary() async {
@@ -172,7 +147,7 @@ class _SalaryPageState extends State<SalaryPage> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          "Salaire du mois",
+                                          "Salaire du cycle",
                                           style: TextStyle(
                                             fontSize: 13,
                                             color: AppTheme.colors.secondary,
@@ -195,7 +170,8 @@ class _SalaryPageState extends State<SalaryPage> {
                                         const SizedBox(height: 3),
 
                                         Text(
-                                          "${_formatMonth(_salary!.month)} ${_salary!.year}",
+                                          "Du ${DatetimeUtil.formatDate(_currentPeriod!.startDate)} "
+                                          "au ${DatetimeUtil.formatDate(_currentPeriod!.endDate.subtract(const Duration(days: 1)))}",
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: AppTheme.colors.textMuted,
@@ -302,7 +278,7 @@ class _SalaryPageState extends State<SalaryPage> {
                             title: Row(
                               children: [
                                 Text(
-                                  "${_formatMonth(salary.month)} ${salary.year}",
+                                  "Cycle du ${DatetimeUtil.formatDate(salary.periodStart)}",
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w600,
                                   ),

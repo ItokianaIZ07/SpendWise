@@ -6,6 +6,6 @@ class MonthlySalaryNotFoundException implements Exception {
 
   @override
   String toString() {
-    return 'Aucun salaire enregistré pour $month/$year';
+    return 'Aucun salaire enregistré pour le cycle commençant en $month/$year';
   }
 }

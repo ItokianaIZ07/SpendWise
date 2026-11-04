@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:gestion_depenses/core/services/notification_service.dart';
 import 'package:gestion_depenses/core/themes/app_theme.dart';
 import 'core/database/database_service.dart';
 import 'package:gestion_depenses/features/navigation/presentation/main_page.dart';
+import 'package:gestion_depenses/services/budget_cycle_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('fr_FR', null);
 
   await DatabaseService.instance.initialize();
 
   await NotificationService.instance.initialize();
+  await BudgetCycleService.initialize();
 
   runApp(
     MaterialApp(

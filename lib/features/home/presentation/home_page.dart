@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:gestion_depenses/core/themes/app_theme.dart';
 import 'package:gestion_depenses/exception/daily_budget_not_found.dart';
@@ -14,11 +16,10 @@ import 'package:gestion_depenses/models/category.dart';
 import 'package:gestion_depenses/models/daily_budget_situation.dart';
 import 'package:gestion_depenses/models/expense.dart';
 import 'package:gestion_depenses/models/monthly_budget_situation.dart';
-import 'package:gestion_depenses/models/monthly_salary.dart';
 import 'package:gestion_depenses/services/budget_service.dart';
+import 'package:gestion_depenses/services/budget_cycle_service.dart';
 import 'package:gestion_depenses/services/category_service.dart';
 import 'package:gestion_depenses/services/expense_service.dart';
-import 'package:gestion_depenses/services/monthly_salary_service.dart';
 
 class HomePage extends StatefulWidget {
   final VoidCallback onNavigateToExpense;
@@ -28,7 +29,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _isLoading = false;
   String date = "";
 
@@ -45,6 +46,9 @@ class _HomePageState extends State<HomePage> {
 
   DailyBudgetSituation? _situation;
   String _message = "";
+  bool _isCheckingSalary = false;
+  Timer? _cycleBoundaryTimer;
+  int _cycleCheckGeneration = 0;
 
   Future<void> _loadCategories() async {
     try {
@@ -131,54 +135,80 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _checkMonthlySalary() async {
-    int month = DatetimeUtil.getNowMonth();
-    int year = DatetimeUtil.getNowYear();
-
+    if (_isCheckingSalary) return;
+    _isCheckingSalary = true;
     try {
-      final situation = await BudgetService.getMonthlySituation(month, year);
-
-      if (!mounted) return;
-
-      setState(() {
-        _monthlySituation = situation;
-      });
-    } on MonthlySalaryNotFoundException {
-      if (!mounted) return;
-
-      final double? salary = await showDialog<double>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) {
-          return const SalaryForm();
-        },
-      );
-
-      if (!mounted) return;
-
-      if (salary != null) {
-        final MonthlySalary monthlySalary = MonthlySalary(
-          month: month,
-          year: year,
-          amount: salary,
-        );
-
-        await MonthlySalaryService.saveSalary(monthlySalary);
-
-        if (!mounted) return;
-
-        final situation = await BudgetService.getMonthlySituation(month, year);
+      final period = await BudgetCycleService.getCurrentPeriod();
+      try {
+        final situation = await BudgetService.getSituationForPeriod(period);
 
         if (!mounted) return;
 
         setState(() {
           _monthlySituation = situation;
         });
+      } on MonthlySalaryNotFoundException {
+        if (!mounted) return;
+
+        final bool? saved = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            return SalaryForm(period: period);
+          },
+        );
+
+        if (saved == true && mounted) {
+          final situation = await BudgetService.getSituationForPeriod(period);
+
+          if (!mounted) return;
+
+          setState(() {
+            _monthlySituation = situation;
+          });
+        }
       }
     } catch (e) {
       debugPrint(
-        "Une erreur est survenue lors de la vérification de la situation du mois : $e",
+        "Une erreur est survenue lors de la vérification du cycle budgétaire : $e",
       );
+    } finally {
+      _isCheckingSalary = false;
     }
+  }
+
+  Future<void> _scheduleCycleBoundaryCheck() async {
+    final generation = ++_cycleCheckGeneration;
+    _cycleBoundaryTimer?.cancel();
+    try {
+      final period = await BudgetCycleService.getCurrentPeriod();
+      if (!mounted || generation != _cycleCheckGeneration) return;
+      final delay = period.endDate.difference(DateTime.now());
+      _cycleBoundaryTimer = Timer(
+        delay.isNegative ? Duration.zero : delay,
+        _refreshCycleAndSalary,
+      );
+    } catch (error) {
+      debugPrint('Impossible de planifier le contrôle du cycle : $error');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshCycleAndSalary();
+    }
+  }
+
+  Future<void> _refreshCycleAndSalary() async {
+    try {
+      await BudgetCycleService.initialize();
+    } catch (error) {
+      debugPrint('Erreur lors de l’actualisation du cycle : $error');
+    }
+    if (!mounted) return;
+    await _checkMonthlySalary();
+    if (mounted) await _scheduleCycleBoundaryCheck();
   }
 
   Future<void> _loadDailySituation() async {
@@ -202,8 +232,10 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     _checkMonthlySalary();
+    _scheduleCycleBoundaryCheck();
 
     _initDate();
     _loadExpenses();
@@ -388,5 +420,13 @@ class _HomePageState extends State<HomePage> {
       //   child: Icon(Icons.add),
       // ),
     );
+  }
+
+  @override
+  void dispose() {
+    _cycleCheckGeneration++;
+    WidgetsBinding.instance.removeObserver(this);
+    _cycleBoundaryTimer?.cancel();
+    super.dispose();
   }
 }
